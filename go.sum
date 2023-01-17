@@ -1,0 +1,6 @@
+github.com/ccmonky/inithook v0.0.0-20230109081757-739280f6d563 h1:4f0JX9nh6N8hMwRgg7MAW27lMjEGBEnpyb0aNdiTEFE=
+github.com/ccmonky/inithook v0.0.0-20230109081757-739280f6d563/go.mod h1:bhgeCeRbFVaG6irxFkZr76cnl4pGwgWlKNkkGmK8bfA=
+github.com/ccmonky/log v0.0.0-20230113103641-7a2de39dc264 h1:1MEHgmOxL3h8jbUHhgxEn2aljLwlzxRFQOpwWAZTIR8=
+github.com/ccmonky/log v0.0.0-20230113103641-7a2de39dc264/go.mod h1:8NBQ0GcqRCrsd+OXDSlfR5qaXeV6WUHHljcu+joOy5k=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
