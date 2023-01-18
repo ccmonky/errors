@@ -9,8 +9,25 @@ import (
 	"github.com/ccmonky/log"
 )
 
+// helper functions for attrs
 var (
-	WithMeta = MetaAttr.With
+	WithMeta   = MetaAttr.With
+	MetaOption = MetaAttr.Option
+
+	WithError   = ErrorAttr.With
+	ErrorOption = ErrorAttr.Option
+
+	WithCtx   = CtxAttr.With
+	CtxOption = CtxAttr.Option
+
+	WithStatus   = StatusAttr.With
+	StatusOption = StatusAttr.Option
+
+	WithCaller   = CallerAttr.With
+	CallerOption = CallerAttr.Option
+
+	StackOption   = StackAttr.Option
+	MessageOption = MessageAttr.Option
 )
 
 // NewMetaError define a new error with meta attached
@@ -35,36 +52,6 @@ func With(err error, opts ...Option) error {
 
 // Option used to attach value on error
 type Option func(error) error
-
-// WithError wrap error's options if it implement `UnwrapAll()(k,v any, error)`, otherwise nothing changed
-func WithError(err, unwrapAllErr error) error {
-	for _, opt := range Options(unwrapAllErr) {
-		err = opt(err)
-	}
-	return err
-}
-
-func Options(err error) []Option {
-	var unwrapOpts []Option
-	for err != nil {
-		uv, ok := err.(interface {
-			UnwrapAll() (any, any, error)
-		})
-		if !ok {
-			break
-		}
-		var k, v any
-		k, v, err = uv.UnwrapAll()
-		unwrapOpts = append(unwrapOpts, func(e error) error {
-			return &valueError{e, k, v}
-		})
-	}
-	var opts = make([]Option, 0, len(unwrapOpts))
-	for i := len(unwrapOpts) - 1; i >= 0; i-- {
-		opts = append(opts, unwrapOpts[i])
-	}
-	return opts
-}
 
 // ContextError is a error with context values
 type ContextError interface {
@@ -129,25 +116,39 @@ func (e *valueError) Value(key any) any {
 	if e.key == key {
 		return e.val
 	}
-	return value(e.error, key)
+	if vg, ok := e.val.(valueGetter); ok {
+		value := vg.Value(key)
+		if value != nil {
+			return value
+		}
+	}
+	return Get(e.error, key)
 }
 
-func value(m error, key any) any {
+func Get(m error, key any) any {
 	for {
 		switch tm := m.(type) {
 		case *valueError:
 			if key == tm.key {
 				return tm.val
 			}
+			if vg, ok := tm.val.(valueGetter); ok {
+				value := vg.Value(key)
+				if value != nil {
+					return value
+				}
+			}
 			m = tm.error
 		case *emptyContextError:
 			return nil
-		case ContextError:
-			return tm.Value(key)
 		default:
 			return nil
 		}
 	}
+}
+
+type valueGetter interface {
+	Value(any) any
 }
 
 // String returns string representation for valueMeta
@@ -164,34 +165,23 @@ func formatByMode(e *valueError) string {
 	formatModeLock.RLock()
 	mode := formatMode
 	formatModeLock.RUnlock()
+	errStr := e.error.Error() + ":"
+	if e.error == empty {
+		errStr = ""
+	}
 	switch mode {
 	case Simplified:
-		if e.error == empty {
-			return "*={*}"
-		}
-		return fmt.Sprintf("%v:*={*}", e.error)
+		return errStr + "*={*}"
 	case NoValue:
-		if e.error == empty {
-			if sp, ok := e.key.(*string); ok {
-				return fmt.Sprintf("%s={*}", *sp)
-			}
-			return fmt.Sprintf("%v={*}", e.key)
-		}
 		if sp, ok := e.key.(*string); ok {
-			return fmt.Sprintf("%v:%s={*}", e.error, *sp)
+			return errStr + *sp + "={*}"
 		}
-		return fmt.Sprintf("%v:%v={*}", e.error, e.key)
+		return errStr + fmt.Sprintf("%v={*}", e.key)
 	default:
-		if e.error == empty {
-			if sp, ok := e.key.(*string); ok {
-				return fmt.Sprintf("%s={%v}", *sp, e.val)
-			}
-			return fmt.Sprintf("%v={%v}", e.key, e.val)
-		}
 		if sp, ok := e.key.(*string); ok {
-			return fmt.Sprintf("%v:%s={%v}", e.error, *sp, e.val)
+			return errStr + fmt.Sprintf("%s={%v}", *sp, e.val)
 		}
-		return fmt.Sprintf("%s:%v={%v}", e.error, e.key, e.val)
+		return errStr + fmt.Sprintf("%v={%v}", e.key, e.val)
 	}
 }
 
@@ -219,19 +209,52 @@ func (e *valueError) Unwrap() error {
 	return e.error
 }
 
+// Is implement errors.Is for valueError, to test if a `valueError` wrap from target, used for error assertion
+//
+// Usage:
+//
+//     err := errors.With(errors.Errorf("xxx"), errors.ErrorOption(errors.NotFound), errors.MessageOption("..."))
+//     errors.Is(err, errros.NotFound) // true
+//
+// NOTE:
+// 1. if err chain first wrapped with a error err1, then wrapped with a second err2, errors.Is(err, err1) is also true!
+func (e *valueError) Is(target error) bool {
+	return ErrorAttr.Get(e) == target
+}
+
+// IsMetaError used to test if err is a meta error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
+func IsMetaError(err, target error) bool {
+	if Cause(err) == target || ErrorAttr.Get(err) == target {
+		return true
+	}
+	return false
+}
+
 // UnwrapAll unwrap to get error, key and value
 func (e *valueError) UnwrapAll() (any, any, error) {
 	return e.key, e.val, e.error
 }
 
-// Is implement errors.Is for metaError, to test if a `MetaError` wrap from target, used for error assertion
-// Usage:
-//
-// err := metaerrors.Adapt(errors.New("origin error"), metaerrors.NotFound) // error suggestion
-// err = errors.WithMessage(err, "wrapper")                                 // error wrapper
-// err = metaerrors.Adapt(err, metaerrors.Unknown)                          // error fallback
-func (e *valueError) Is(target error) bool {
-	return MetaAttr.Get(e) == MetaAttr.Get(target)
+func Options(err error) []Option {
+	var unwrapOpts []Option
+	for err != nil {
+		uv, ok := err.(interface {
+			UnwrapAll() (any, any, error)
+		})
+		if !ok {
+			break
+		}
+		var k, v any
+		k, v, err = uv.UnwrapAll()
+		unwrapOpts = append(unwrapOpts, func(e error) error {
+			return &valueError{e, k, v}
+		})
+	}
+	var opts = make([]Option, 0, len(unwrapOpts))
+	for i := len(unwrapOpts) - 1; i >= 0; i-- {
+		opts = append(opts, unwrapOpts[i])
+	}
+	return opts
 }
 
 // Cause returns the underlying cause of the error, if possible.

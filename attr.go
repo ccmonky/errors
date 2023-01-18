@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"context"
 	"net/http"
 	"sync"
 
@@ -8,6 +9,12 @@ import (
 )
 
 var (
+	// ErrorAttr used to attach another error on input error, usually used to attach meta error
+	ErrorAttr = NewAttr[error]("error", WithAttrDescription("error as an attr"))
+
+	// CtxAttr used to attach context.Context on error
+	CtxAttr = NewAttr[context.Context]("ctx", WithAttrDescription("context.Context as an attr"))
+
 	// Meta used to attach meta to ContextError
 	MetaAttr = NewAttr[*Meta]("meta", WithAttrDescription("meta as an attr"))
 
@@ -171,6 +178,8 @@ func (a *Attr[T]) Get(err error) T {
 		value := ce.Value(a.key)
 		if tv, ok := value.(T); ok {
 			return tv
+		} else {
+			log.Panicf("attr %v got invalid type value, expect %T, got %T", *a.key, *new(T), value)
 		}
 	}
 	if a.defaultValue != nil {
