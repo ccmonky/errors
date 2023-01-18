@@ -15,14 +15,11 @@ var (
 	// CtxAttr used to attach context.Context on error
 	CtxAttr = NewAttr[context.Context]("ctx", WithAttrDescription("context.Context as an attr"))
 
-	// Meta used to attach meta to ContextError
+	// Meta used to attach meta to Error
 	MetaAttr = NewAttr[*Meta]("meta", WithAttrDescription("meta as an attr"))
 
-	// Message used to attach message to ContextError
+	// Message used to attach message to Error
 	MessageAttr = NewAttr[string]("msg", WithAttrDescription("message as an attr"))
-
-	// CtxErr used to attach values contained in a context error, mainly used for attach builtin codes and also support `errors.Is`
-	//CtxErr = NewAttr[ContextError]("ctxerr", WithAttrDescription("context error as an attr"))
 
 	// Status used as meta value stands for http status,
 	// Status.Get returns http status if err is MetaError with status attached,
@@ -174,7 +171,7 @@ func (a *Attr[T]) Option(value T) Option {
 
 // Get get value specified by Attr's internal key from error if implement MetaError, otherwise return default value
 func (a *Attr[T]) Get(err error) T {
-	if ce, ok := err.(ContextError); ok {
+	if ce, ok := err.(Error); ok {
 		value := ce.Value(a.key)
 		if tv, ok := value.(T); ok {
 			return tv

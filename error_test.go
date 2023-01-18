@@ -8,21 +8,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestContextError(t *testing.T) {
+func TestError(t *testing.T) {
 	assert.Equalf(t, "meta={source=errors;code=not_found(5)}:status={404}", errors.NotFound.Error(), "notFound error")
 	originErr := errors.Errorf("xxx")
 	err := errors.WithError(originErr, errors.NotFound)
 	err = errors.MessageAttr.With(err, "wrapper")
-	err = errors.CallerAttr.With(err, "TestContextError")
+	err = errors.CallerAttr.With(err, "TestError")
 	var kkk string
 	ctx := context.WithValue(context.TODO(), &kkk, "vvv")
 	err = errors.CtxAttr.With(err, ctx)
-	assert.Equalf(t, "xxx:error={meta={source=errors;code=not_found(5)}:status={404}}:msg={wrapper}:caller={TestContextError}:ctx={context.TODO.WithValue(type *string, val vvv)}", err.Error(), "err chain")
+	assert.Equalf(t, "xxx:error={meta={source=errors;code=not_found(5)}:status={404}}:msg={wrapper}:caller={TestError}:ctx={context.TODO.WithValue(type *string, val vvv)}", err.Error(), "err chain")
 	assert.Truef(t, errors.Is(err, originErr), "err is originErr")
 	assert.Truef(t, errors.Is(err, errors.NotFound), "err is notfound")
 	assert.Truef(t, !errors.Is(err, errors.AlreadyExists), "err is not alreadyexists")
 	assert.Equalf(t, "wrapper", errors.Get(err, errors.MessageAttr.Key()), "err message")
-	assert.Equalf(t, "TestContextError", errors.Get(err, errors.CallerAttr.Key()), "err caller")
+	assert.Equalf(t, "TestError", errors.Get(err, errors.CallerAttr.Key()), "err caller")
 	assert.Equalf(t, ctx, errors.Get(err, errors.CtxAttr.Key()), "ctx")
 	assert.Equalf(t, "vvv", errors.Get(err, &kkk), "kkk value")
 	meta := errors.MetaAttr.Get(err)
@@ -33,7 +33,7 @@ func TestContextError(t *testing.T) {
 	assert.Equalf(t, 404, errors.StatusAttr.Get(err), "err status")
 	assert.Equalf(t, "xxx", errors.Cause(err).Error(), "err cause")
 	err = errors.WithError(err, errors.AlreadyExists)
-	assert.Equalf(t, "xxx:error={meta={source=errors;code=not_found(5)}:status={404}}:msg={wrapper}:caller={TestContextError}:ctx={context.TODO.WithValue(type *string, val vvv)}:error={meta={source=errors;code=already_exists(6)}:status={409}}", err.Error(), "err with alreadyexists")
+	assert.Equalf(t, "xxx:error={meta={source=errors;code=not_found(5)}:status={404}}:msg={wrapper}:caller={TestError}:ctx={context.TODO.WithValue(type *string, val vvv)}:error={meta={source=errors;code=already_exists(6)}:status={409}}", err.Error(), "err with alreadyexists")
 	assert.Truef(t, errors.Is(err, originErr), "err is originErr")
 	assert.Truef(t, errors.Is(err, errors.NotFound), "err is notfound") // NOTE: also true
 	assert.Truef(t, errors.Is(err, errors.AlreadyExists), "err is not alreadyexists")

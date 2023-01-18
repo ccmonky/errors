@@ -7,13 +7,13 @@ import (
 )
 
 // Adapt defaultAdapter's Adapt
-func Adapt(err error, defaultCtxErr ContextError, opts ...Option) error {
+func Adapt(err error, defaultCtxErr Error, opts ...Option) error {
 	return defaultAdapter.Adapt(err, defaultCtxErr, opts...)
 }
 
 // Adapter provides `Adapt` mainly to support suggestive error, error delivery path, error overrides ...
 type Adapter interface {
-	Adapt(err error, defaultCtxErr ContextError, opts ...Option) error
+	Adapt(err error, defaultCtxErr Error, opts ...Option) error
 }
 
 // NewAdapter creates a new Adapter, usually no need to create a new one, just use the default `Adapt` function is enough
@@ -63,10 +63,10 @@ type adapter struct {
 	DefaultOptions []Option
 }
 
-// Adapt append defaultMeta into err if err is not ContextError, otherwise only apply opts into err's exist Meta
+// Adapt append defaultMeta into err if err is not Error, otherwise only apply opts into err's exist Meta
 // note, Adapt will first find the latest Meta(override scenario) specified by meta.App() and meta.Code()
 // there are also some connor scenarios rarely used, Adapt will try best to action as expected.
-func (a *adapter) Adapt(err error, defaultCtxErr ContextError, opts ...Option) error {
+func (a *adapter) Adapt(err error, defaultCtxErr Error, opts ...Option) error {
 	if err == nil {
 		return nil
 	}

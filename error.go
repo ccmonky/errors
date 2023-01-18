@@ -68,32 +68,32 @@ func WithErrorOptions(err, optsErr error) error {
 // Option used to attach value on error
 type Option func(error) error
 
-// ContextError is a error with context values
-type ContextError interface {
+// Error is a error with context values
+type Error interface {
 	error
 
 	// Value get value specified by key in the Meta
 	Value(key any) any
 }
 
-type emptyContextError struct{}
+type emptyError struct{}
 
-func (e *emptyContextError) String() string {
+func (e *emptyError) String() string {
 	return ""
 }
 
-func (e *emptyContextError) Error() string {
+func (e *emptyError) Error() string {
 	return ""
 }
 
-func (*emptyContextError) Value(key any) any {
+func (*emptyError) Value(key any) any {
 	return nil
 }
 
-// Empty returns a non-nil, empty ContextError. It has no values.
+// Empty returns a non-nil, empty Error. It has no values.
 // It is typically used by the main function, initialization, and tests,
-// and as the top-level ContextError when define a new ContextError.
-func Empty() ContextError {
+// and as the top-level Error when define a new Error.
+func Empty() Error {
 	return empty
 }
 
@@ -154,7 +154,7 @@ func Get(m error, key any) any {
 				}
 			}
 			m = tm.error
-		case *emptyContextError:
+		case *emptyError:
 			return nil
 		default:
 			return nil
@@ -320,7 +320,7 @@ func SetFormatMode(mode FormatMode) {
 }
 
 var (
-	empty = new(emptyContextError)
+	empty = new(emptyError)
 )
 
 var (
