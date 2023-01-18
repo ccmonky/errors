@@ -2,6 +2,7 @@ package errors
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -223,11 +224,11 @@ func MustGetAttrByKey[T any](key any) *Attr[T] {
 func GetAttrByKey[T any](key any) (*Attr[T], error) {
 	v, ok := attrs.Load(key)
 	if !ok {
-		return nil, nil // Adapt(fmt.Errorf("attr(name=%s) with key(%v) not found", *key.(*string), key), NotFound)
+		return nil, WithError(fmt.Errorf("attr(name=%s) with key(%v) not found", *key.(*string), key), NotFound)
 	}
 	a, ok := v.(*Attr[T])
 	if !ok {
-		return nil, nil // Adapt(fmt.Errorf("attr(name=%s) with type %T not found", *key.(*string), *new(T)), NotFound)
+		return nil, WithError(fmt.Errorf("attr(name=%s) with type %T not found", *key.(*string), *new(T)), NotFound)
 	}
 	return a, nil
 }
@@ -246,11 +247,11 @@ func MustGetAttrByName[T any](name string) *Attr[T] {
 func GetAttrByName[T any](name string) (*Attr[T], error) {
 	v, ok := nameAttrs.Load(name)
 	if !ok {
-		return nil, nil // Adapt(fmt.Errorf("attr with name %s not found", name), NotFound)
+		return nil, WithError(fmt.Errorf("attr with name %s not found", name), NotFound)
 	}
 	a, ok := v.(*Attr[T])
 	if !ok {
-		return nil, nil // Adapt(fmt.Errorf("attr(name=%s) with type %T not found", name, *new(T)), NotFound)
+		return nil, WithError(fmt.Errorf("attr(name=%s) with type %T not found", name, *new(T)), NotFound)
 	}
 	return a, nil
 }

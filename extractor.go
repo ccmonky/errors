@@ -52,9 +52,9 @@ func GetCode(err error) string {
 		return m.code
 	}
 	if err != nil {
-		return "unknown(2)" //Unknown.Code()
+		return MetaAttr.Get(Unknown).Code()
 	}
-	return "success(0)" //OK.Code()
+	return MetaAttr.Get(OK).Code()
 }
 
 // GetMessage returns error message if err is ContextError, otherwise return Unknown.Message() if err != nil else return Ok.Message()
@@ -64,7 +64,7 @@ func GetMessage(err error) string {
 		return m.msg
 	}
 	if err != nil {
-		return "server throws an exception" //Unknown.Message()
+		return MetaAttr.Get(Unknown).Message()
 	}
-	return "success" // OK.Message()
+	return MetaAttr.Get(OK).Message()
 }

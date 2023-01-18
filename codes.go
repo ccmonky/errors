@@ -1,6 +1,9 @@
 package errors
 
-import "net/http"
+import (
+	"net/http"
+	"reflect"
+)
 
 // refer to `https://grpc.github.io/grpc/core/md_doc_statuscodes.html`
 var (
@@ -24,6 +27,8 @@ var (
 )
 
 var (
-	source = "github.com/ccmonky/errors"
+	source = reflect.TypeOf(_pkgtype{}).PkgPath()
 	status = StatusAttr.Option
 )
+
+type _pkgtype struct{}

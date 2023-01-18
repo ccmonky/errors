@@ -45,12 +45,36 @@ func With(err error, opts ...Option) error {
 		return nil
 	}
 	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
 		err = opt(err)
 	}
 	return err
 }
 
-func WithMetaNx(err, metaErr error, opts ...Option) error {
+// WithMetaNx wrap err with a metaErr(if not contains meta, metaErr will be `Unknown`) and extra options
+func WithMetaNx(err, metaErr error) error {
+	if err == nil {
+		return nil
+	}
+	if MetaAttr.Get(metaErr) == nil {
+		metaErr = Unknown
+	}
+	dyn := MetaAttr.Get(metaErr)
+	if dyn == nil {
+		return With(WithError(err, metaErr), addCaller())
+	}
+	return With(err, addCaller())
+}
+
+func addCaller() Option {
+	noCallerForNxLock.RLock()
+	add := !noCallerForNx
+	noCallerForNxLock.RUnlock()
+	if add {
+		return CallerAttr.Option(caller(3))
+	}
 	return nil
 }
 
@@ -237,6 +261,38 @@ func (e *valueError) Is(target error) bool {
 	return ErrorAttr.Get(e) == target
 }
 
+func (e *valueError) App() string {
+	meta := MetaAttr.Get(e)
+	if meta == nil {
+		meta.App()
+	}
+	return ""
+}
+
+func (e *valueError) Source() string {
+	meta := MetaAttr.Get(e)
+	if meta == nil {
+		meta.Source()
+	}
+	return ""
+}
+
+func (e *valueError) Code() string {
+	meta := MetaAttr.Get(e)
+	if meta == nil {
+		meta.Code()
+	}
+	return ""
+}
+
+func (e *valueError) Message() string {
+	meta := MetaAttr.Get(e)
+	if meta == nil {
+		meta.Message()
+	}
+	return ""
+}
+
 // IsError used to test if err is a error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
 func IsError(err, target error) bool {
 	if Cause(err) == target || ErrorAttr.Get(err) == target {
@@ -326,4 +382,7 @@ var (
 var (
 	formatMode     = Default
 	formatModeLock sync.RWMutex
+
+	noCallerForNx     bool
+	noCallerForNxLock sync.RWMutex
 )

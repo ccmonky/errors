@@ -47,4 +47,55 @@ func TestError(t *testing.T) {
 	assert.Truef(t, errors.IsError(err, errors.AlreadyExists), "err is alreadyexists")
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) == errors.AlreadyExists, "get err is alreadyexists")
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) != errors.NotFound, "get err is not notfound")
+	err = errors.WithMetaNx(err, errors.FailedPrecondition)
+	assert.Equalf(t, "xxx:error={meta={source=errors;code=not_found(5)}:status={404}}:msg={wrapper}:caller={TestError}:ctx={context.TODO.WithValue(type *string, val vvv)}:error={meta={source=errors;code=already_exists(6)}:status={409}}:caller={errors_test.TestError}", err.Error(), "err with alreadyexists")
+	assert.Truef(t, errors.Is(err, originErr), "err is originErr after with FailedPrecondition")
+	assert.Truef(t, errors.Is(err, errors.NotFound), "err is notfound after with FailedPrecondition") // NOTE: also true
+	assert.Truef(t, errors.Is(err, errors.AlreadyExists), "err is not alreadyexists after with FailedPrecondition")
+	assert.Truef(t, !errors.Is(err, errors.FailedPrecondition), "err is not alreadyexists after with FailedPrecondition")
+	assert.Truef(t, errors.IsError(err, originErr), "err is originErr after with FailedPrecondition")
+	assert.Truef(t, !errors.IsError(err, errors.NotFound), "err is not notfound  after with FailedPrecondition")
+	assert.Truef(t, errors.IsError(err, errors.AlreadyExists), "err is alreadyexists after with FailedPrecondition")
+	assert.Truef(t, !errors.IsError(err, errors.FailedPrecondition), "err is not alreadyexists after with FailedPrecondition")
+	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) == errors.AlreadyExists, "get err is alreadyexists after with FailedPrecondition")
+	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) != errors.NotFound, "get err is not notfound after with FailedPrecondition")
+	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) != errors.FailedPrecondition, "get err is not notfound after with FailedPrecondition")
+}
+
+func BenchmarkError(b *testing.B) {
+	err := errors.WithError(errors.New("xxx"), errors.NotFound)
+	err = errors.WithMessage(err, "wrapper1")
+	err = errors.WithCaller(err, "caller1")
+	err = errors.WithMessage(err, "wrapper2")
+	var k string
+	err = errors.WithCtx(err, context.WithValue(context.TODO(), &k, "v"))
+	err = errors.WithMessage(err, "wrapper3")
+	err = errors.WithStatus(err, 409)
+	err = errors.WithMessage(err, "wrapper4")
+	err = errors.WithValue(err, "k4", "v4")
+	err = errors.WithMessage(err, "wrapper5")
+	err = errors.WithValue(err, "k5", "v5")
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		// goos: darwin
+		// goarch: amd64
+		// pkg: github.com/ccmonky/errors
+		// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+		// BenchmarkError-12    	 5816956	       204.1 ns/op	       0 B/op	       0 allocs/op
+		errors.MetaAttr.Get(err)
+
+		// goos: darwin
+		// goarch: amd64
+		// pkg: github.com/ccmonky/errors
+		// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+		// BenchmarkError-12    	45875535	        29.66 ns/op	       0 B/op	       0 allocs/op
+		//errors.MessageAttr.Get(err)
+
+		// goos: darwin
+		// goarch: amd64
+		// pkg: github.com/ccmonky/errors
+		// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+		// BenchmarkError-12    	 9519049	       123.2 ns/op	       0 B/op	       0 allocs/op
+		//errors.Cause(err)
+	}
 }
