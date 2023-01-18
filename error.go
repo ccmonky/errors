@@ -4,10 +4,23 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/ccmonky/log"
 )
+
+// Option used to attach value on error
+type Option func(error) error
+
+// Error is a error with context values
+type Error interface {
+	error
+
+	// Value get value specified by key in the Meta
+	Value(key any) any
+}
 
 // helper functions for attrs
 var (
@@ -78,6 +91,13 @@ func addCaller() Option {
 	return nil
 }
 
+func caller(skip int) string {
+	pc, _, _, _ := runtime.Caller(skip)
+	path := runtime.FuncForPC(pc).Name()
+	parts := strings.Split(path, "/")
+	return parts[len(parts)-1]
+}
+
 // WithErrorOptions
 func WithErrorOptions(err, optsErr error) error {
 	if err == nil {
@@ -87,17 +107,6 @@ func WithErrorOptions(err, optsErr error) error {
 		err = opt(err)
 	}
 	return err
-}
-
-// Option used to attach value on error
-type Option func(error) error
-
-// Error is a error with context values
-type Error interface {
-	error
-
-	// Value get value specified by key in the Meta
-	Value(key any) any
 }
 
 type emptyError struct{}
@@ -259,38 +268,6 @@ func (e *valueError) Unwrap() error {
 // 1. if err chain first wrapped with a error err1, then wrapped with a second err2, errors.Is(err, err1) is also true!
 func (e *valueError) Is(target error) bool {
 	return ErrorAttr.Get(e) == target
-}
-
-func (e *valueError) App() string {
-	meta := MetaAttr.Get(e)
-	if meta == nil {
-		meta.App()
-	}
-	return ""
-}
-
-func (e *valueError) Source() string {
-	meta := MetaAttr.Get(e)
-	if meta == nil {
-		meta.Source()
-	}
-	return ""
-}
-
-func (e *valueError) Code() string {
-	meta := MetaAttr.Get(e)
-	if meta == nil {
-		meta.Code()
-	}
-	return ""
-}
-
-func (e *valueError) Message() string {
-	meta := MetaAttr.Get(e)
-	if meta == nil {
-		meta.Message()
-	}
-	return ""
 }
 
 // IsError used to test if err is a error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
