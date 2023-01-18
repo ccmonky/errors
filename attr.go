@@ -37,9 +37,6 @@ var (
 	// Caller used as meta value stands for runtime.Caller info
 	CallerAttr = NewAttr[string]("caller", WithAttrDescription("caller as an attr"))
 
-	// Overridable used as meta value and specify if the Meta can be overrideed
-	OverridableAttr = NewAttr[bool]("overridable", WithAttrDescription("overridable as an attr"))
-
 	// Stack attach `github.com/pkg/errors.stack` on error
 	StackAttr = NewAttr[*stack]("stack", WithAttrDescription("github.com/pkg/errors.stack as an attr"))
 )

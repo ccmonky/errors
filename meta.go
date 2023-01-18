@@ -1,25 +1,35 @@
 package errors
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"sync"
 
-	"github.com/ccmonky/inithook"
+	"github.com/ccmonky/log"
 )
 
-// NewMeta creates a new Meta
-func NewMeta(source, code, msg string) *Meta {
-	m := Meta{
-		app:    AppName,
-		source: source,
-		code:   code,
-		msg:    msg,
+type MetaError interface {
+	error
+	App() string
+	Source() string
+	Code() string
+	Message() string
+}
+
+// NewMetaError define a new error with meta attached
+func NewMetaError(source, code, msg string, opts ...Option) MetaError {
+	e := MetaAttr.With(empty, newMeta(source, code, msg))
+	for _, opt := range opts {
+		e = opt(e)
 	}
-	return &m
+	me := e.(MetaError)
+	err := RegisterMetaError(me)
+	if err != nil {
+		log.Panicln(err, "register meta error failed")
+		return nil
+	}
+	return me
 }
 
 type Meta struct {
@@ -27,6 +37,17 @@ type Meta struct {
 	source string
 	code   string
 	msg    string
+}
+
+// newMeta creates a new Meta
+func newMeta(source, code, msg string) *Meta {
+	m := Meta{
+		app:    AppName,
+		source: source,
+		code:   code,
+		msg:    msg,
+	}
+	return &m
 }
 
 func (e *Meta) App() string {
@@ -72,38 +93,41 @@ func pkgName(source string) string {
 	return parts[len(parts)-1]
 }
 
-// RegisterMeta register Meta into metas registry, news will be override olds,
-// it's best for app register Meta before any `Adapt` calls, usually in init phase.
-func RegisterMeta(meta *Meta) {
-	if meta == nil {
-		log.Println("register nil Meta")
-		return
+// RegisterMetaError register MetaError into metaErrors registry, return error is exists
+func RegisterMetaError(me MetaError) error {
+	if me == nil {
+		return New("register nil meta error, just ignore")
 	}
-	metasLock.Lock()
-	defer metasLock.Unlock()
-	id := meta.ID()
-	if _, ok := metas[id]; ok {
-		if !OverridableAttr.GetAny(meta) { // FIXME:
-			log.Panicf("Meta %s already exists and no overridable attr found", id)
-		}
+	if me.App() != AppName() {
+		return Errorf("meta error app(%s) != current app name %s", me.App(), AppName())
 	}
-	metas[id] = meta
+	id := MetaID(me.App(), me.Source(), me.Code())
+	if me.Source() == "" || me.Code() == "" || me.Message() == "" {
+		return Errorf("meta error(%s): source, code and msg can not be empty", id)
+	}
+	metaErrorsLock.Lock()
+	defer metaErrorsLock.Unlock()
+	if _, ok := metaErrors[id]; ok {
+		return Errorf("meta error %s already exists; use with_xxx to rebind", id)
+	}
+	metaErrors[id] = me
+	return nil
 }
 
-// GetMeta get Meta according to app and code
-func GetMeta(id string) *Meta {
-	metasLock.RLock()
-	defer metasLock.RUnlock()
-	return metas[id]
+// GetMetaError get Meta according to app, source and code
+func GetMetaError(id string) MetaError {
+	metaErrorsLock.RLock()
+	defer metaErrorsLock.RUnlock()
+	return metaErrors[id]
 }
 
-// metas return all registered metas as a map with key is `app:code`
-func Metas() map[metaID]*Meta {
-	var result = map[metaID]*Meta{}
-	metasLock.RLock()
-	defer metasLock.RUnlock()
-	for id, Meta := range metas {
-		result[id] = Meta
+// MetaErrors return all registered MetaErrors as a map with key is `app:source:code`
+func MetaErrors() map[metaID]MetaError {
+	var result = map[metaID]MetaError{}
+	metaErrorsLock.RLock()
+	defer metaErrorsLock.RUnlock()
+	for id, me := range metaErrors {
+		result[id] = me
 	}
 	return result
 }
@@ -116,43 +140,37 @@ func AppName() string {
 }
 
 // SetAppName set app name and register Meta to new app namespace
-func SetAppName(appNew string) {
+func SetAppName(appNew string) error {
 	appLock.Lock()
 	appOld := app
 	app = appNew
 	appLock.Unlock()
-	metasLock.Lock()
+	metaErrorsLock.Lock()
 	if appOld != appNew {
-		newmetas := make(map[metaID]*Meta, len(metas))
-		for _, meta := range metas {
-			idNew := meta.ID()
-			if _, ok := metas[idNew]; ok {
-				if !OverridableAttr.GetAny(meta) {
-					log.Panicf("Meta %s already exists and no overridable attr found", idNew)
-				}
+		newMetaErrors := make(map[metaID]MetaError, len(metaErrors))
+		for _, me := range metaErrors {
+			idNew := MetaID(me.App(), me.Source(), me.Code())
+			if _, ok := metaErrors[idNew]; ok {
+				return Errorf("meta error(%s) already exists", idNew)
 			}
-			newmetas[idNew] = meta
+			newMetaErrors[idNew] = me
 		}
-		for id, Meta := range newmetas {
-			metas[id] = Meta
+		for id, me := range newMetaErrors {
+			metaErrors[id] = me
 		}
 	}
-	metasLock.Unlock()
+	metaErrorsLock.Unlock()
+	return nil
 }
 
-func init() {
-	inithook.RegisterAttrSetter(inithook.AppName, "errors", func(ctx context.Context, value string) error {
-		SetAppName(value)
-		return nil
-	})
+// MetaID returns a unique id of `Meta`
+func MetaID(app, source, code string) string {
+	return fmt.Sprintf("%s:%s:%s", app, source, code)
 }
 
 var (
-	app     string
-	appLock sync.RWMutex
-
-	metas     = make(map[metaID]*Meta)
-	metasLock sync.RWMutex
+	metaErrors     = make(map[metaID]MetaError)
+	metaErrorsLock sync.RWMutex
 )
 
 type metaID = string

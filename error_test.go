@@ -5,8 +5,16 @@ import (
 	"testing"
 
 	"github.com/ccmonky/errors"
+	"github.com/ccmonky/inithook"
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	err := inithook.ExecuteAttrSetters(context.Background(), inithook.AppName, "myapp")
+	if err != nil {
+		panic(err)
+	}
+}
 
 func TestError(t *testing.T) {
 	assert.Equalf(t, "meta={source=errors;code=not_found(5)}:status={404}", errors.NotFound.Error(), "notFound error")

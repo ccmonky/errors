@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -8,8 +9,15 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ccmonky/inithook"
 	"github.com/ccmonky/log"
 )
+
+func init() {
+	inithook.RegisterAttrSetter(inithook.AppName, "errors", func(ctx context.Context, value string) error {
+		return SetAppName(value)
+	})
+}
 
 // Option used to attach value on error
 type Option func(error) error
@@ -43,15 +51,6 @@ var (
 	MessageOption = MessageAttr.Option
 )
 
-// NewMetaError define a new error with meta attached
-func NewMetaError(source, code, msg string, opts ...Option) error {
-	ce := MetaAttr.With(empty, NewMeta(source, code, msg))
-	for _, opt := range opts {
-		ce = opt(ce)
-	}
-	return ce
-}
-
 // With used to attach multiple values on error with options
 func With(err error, opts ...Option) error {
 	if err == nil {
@@ -67,16 +66,28 @@ func With(err error, opts ...Option) error {
 }
 
 // WithMetaNx wrap err with a metaErr(if not contains meta, metaErr will be `Unknown`) and extra options
-func WithMetaNx(err, metaErr error) error {
+func WithMetaNx(err error, guard MetaError) error {
 	if err == nil {
 		return nil
 	}
-	if MetaAttr.Get(metaErr) == nil {
-		metaErr = Unknown
+	if guard == nil {
+		guard = Unknown
 	}
-	dyn := MetaAttr.Get(metaErr)
+	if guard.App() != AppName() {
+		log.Panicf("gurad meta error's app(%s) != current app name(%s)\n", guard.App(), AppName())
+		return err
+	}
+	dyn := MetaAttr.Get(err)
 	if dyn == nil {
-		return With(WithError(err, metaErr), addCaller())
+		return With(WithError(err, guard), addCaller())
+	}
+	if dyn.App() != AppName() { // NOTE: maybe upstream case || bad dynamic case
+		e := MataMapping()(dyn) // NOTE: try to map to current app's meta error by source & code
+		if e != nil {
+			return With(WithError(err, guard), addCaller())
+		}
+		log.Panicf("can not found current app's meta error for %s:%s\n", err, dyn.Source(), dyn.Code())
+		return err
 	}
 	return With(err, addCaller())
 }
@@ -270,6 +281,38 @@ func (e *valueError) Is(target error) bool {
 	return ErrorAttr.Get(e) == target
 }
 
+func (e *valueError) App() string {
+	value := e.Value(MetaAttr.Key())
+	if m, ok := value.(*Meta); ok {
+		return m.app()
+	}
+	return ""
+}
+
+func (e *valueError) Source() string {
+	value := e.Value(MetaAttr.Key())
+	if m, ok := value.(*Meta); ok {
+		return m.source
+	}
+	return ""
+}
+
+func (e *valueError) Code() string {
+	value := e.Value(MetaAttr.Key())
+	if m, ok := value.(*Meta); ok {
+		return m.code
+	}
+	return ""
+}
+
+func (e *valueError) Message() string {
+	value := e.Value(MetaAttr.Key())
+	if m, ok := value.(*Meta); ok {
+		return m.msg
+	}
+	return ""
+}
+
 // IsError used to test if err is a error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
 func IsError(err, target error) bool {
 	if Cause(err) == target || ErrorAttr.Get(err) == target {
@@ -354,12 +397,40 @@ func SetFormatMode(mode FormatMode) {
 
 var (
 	empty = new(emptyError)
-)
 
-var (
+	app     string
+	appLock sync.RWMutex
+
 	formatMode     = Default
 	formatModeLock sync.RWMutex
 
 	noCallerForNx     bool
 	noCallerForNxLock sync.RWMutex
+
+	metaMapping     = mappingBySourceCode
+	metaMappingLock sync.RWMutex
 )
+
+func MataMapping() func(*Meta) MetaError {
+	metaMappingLock.RLock()
+	defer metaMappingLock.RUnlock()
+	return metaMapping
+}
+
+func SetMataMapping(fn func(*Meta) MetaError) {
+	metaMappingLock.Lock()
+	defer metaMappingLock.Unlock()
+	metaMapping = fn
+}
+
+// mappingBySourceCode map meta to another by code and source in current app codes
+func mappingBySourceCode(upstream *Meta) MetaError {
+	metaErrorsLock.RLock()
+	defer metaErrorsLock.RUnlock()
+	for id, me := range metaErrors {
+		if MetaID(AppName(), upstream.Source(), upstream.Code()) == id {
+			return me
+		}
+	}
+	return nil
+}
