@@ -11,11 +11,11 @@ import (
 
 // helper functions for attrs
 var (
-	WithMeta   = MetaAttr.With
-	MetaOption = MetaAttr.Option
-
 	WithError   = ErrorAttr.With
 	ErrorOption = ErrorAttr.Option
+
+	WithMeta   = MetaAttr.With
+	MetaOption = MetaAttr.Option
 
 	WithCtx   = CtxAttr.With
 	CtxOption = CtxAttr.Option
@@ -45,6 +45,21 @@ func With(err error, opts ...Option) error {
 		return nil
 	}
 	for _, opt := range opts {
+		err = opt(err)
+	}
+	return err
+}
+
+func WithMetaNx(err, metaErr error, opts ...Option) error {
+	return nil
+}
+
+// WithErrorOptions
+func WithErrorOptions(err, optsErr error) error {
+	if err == nil {
+		return nil
+	}
+	for _, opt := range Options(optsErr) {
 		err = opt(err)
 	}
 	return err
@@ -222,8 +237,8 @@ func (e *valueError) Is(target error) bool {
 	return ErrorAttr.Get(e) == target
 }
 
-// IsMetaError used to test if err is a meta error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
-func IsMetaError(err, target error) bool {
+// IsError used to test if err is a error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
+func IsError(err, target error) bool {
 	if Cause(err) == target || ErrorAttr.Get(err) == target {
 		return true
 	}
@@ -294,6 +309,15 @@ const (
 	// Default format value meta as `meta.String():key=*`
 	NoValue
 )
+
+func SetFormatMode(mode FormatMode) {
+	formatModeLock.Lock()
+	defer formatModeLock.Unlock()
+	if mode != Default && mode != Simplified && mode != NoValue {
+		mode = Default
+	}
+	formatMode = mode
+}
 
 var (
 	empty = new(emptyContextError)

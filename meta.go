@@ -140,15 +140,6 @@ func SetAppName(appNew string) {
 	metasLock.Unlock()
 }
 
-func SetFormatMode(mode FormatMode) {
-	formatModeLock.Lock()
-	defer formatModeLock.Unlock()
-	if mode != Default && mode != Simplified && mode != NoValue {
-		formatMode = Default
-	}
-	formatMode = mode
-}
-
 func init() {
 	inithook.RegisterAttrSetter(inithook.AppName, "errors", func(ctx context.Context, value string) error {
 		SetAppName(value)
