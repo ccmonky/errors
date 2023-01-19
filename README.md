@@ -161,7 +161,6 @@ assert.Equalf(t, "source=errors;code=already_exists(6)", fmt.Sprint(m["meta"]), 
 
 // errors.Attrs: get values of specified attrs
 // NOTE: error and *Meta will be flatten
-err = errors.WithValue(err, &ks, "ks")
 m := errors.NewAttrs(errors.ErrorAttr, errors.MessageAttr).Map(err)
 assert.Equalf(t, 8, len(m), "m length")
 assert.Equalf(t, "myapp", m["meta.app"], "meta.app")
