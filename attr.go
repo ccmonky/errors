@@ -183,23 +183,17 @@ func (a *Attr[T]) Get(err error) T {
 	return *new(T)
 }
 
-// Get get value specified by Attr's internal key from any object that implement `Value(any)any` interface,
-// which maybe a Meta, MetaError or context.Context, ...
-func (a *Attr[T]) GetAny(v any) T {
-	if fv, ok := v.(interface {
-		Value(any) any
-	}); ok {
-		value := fv.Value(a.key)
+func (a *Attr[T]) GetAll(err error) []T {
+	var all []T
+	values := GetAll(err, a.key)
+	for _, value := range values {
 		if tv, ok := value.(T); ok {
-			return tv
+			all = append(all, tv)
+		} else {
+			log.Panicf("attr %v got invalid type value, expect %T, got %T", *a.key, *new(T), value)
 		}
 	}
-	if a.defaultValue != nil {
-		if err, ok := v.(error); ok {
-			return a.defaultValue(err).(T)
-		}
-	}
-	return *new(T)
+	return all
 }
 
 // NewAttrKey used to creates a new Attr's internal key

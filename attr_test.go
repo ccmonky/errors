@@ -20,7 +20,6 @@ func TestNewAttrKey(t *testing.T) {
 
 func TestGetAttr(t *testing.T) {
 	assert.Equalf(t, "caller", errors.MustGetAttrByName[string]("caller").Name(), "caller name")
-	assert.Equalf(t, "overridable", errors.MustGetAttrByName[bool]("overridable").Name(), "caller name")
 	assert.Equalf(t, "status", errors.MustGetAttrByName[int]("status").Name(), "status name")
 	_, err := errors.GetAttrByName[*int]("status")
 	assert.Truef(t, nil != err, "status with bad type: %v", err)

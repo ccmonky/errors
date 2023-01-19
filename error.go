@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/ccmonky/inithook"
@@ -63,50 +61,6 @@ func With(err error, opts ...Option) error {
 		err = opt(err)
 	}
 	return err
-}
-
-// WithMetaNx wrap err with a metaErr(if not contains meta, metaErr will be `Unknown`) and extra options
-func WithMetaNx(err error, guard MetaError) error {
-	if err == nil {
-		return nil
-	}
-	if guard == nil {
-		guard = Unknown
-	}
-	if guard.App() != AppName() {
-		log.Panicf("gurad meta error's app(%s) != current app name(%s)\n", guard.App(), AppName())
-		return err
-	}
-	dyn := MetaAttr.Get(err)
-	if dyn == nil {
-		return With(WithError(err, guard), addCaller())
-	}
-	if dyn.App() != AppName() { // NOTE: maybe upstream case || bad dynamic case
-		e := MataMapping()(dyn) // NOTE: try to map to current app's meta error by source & code
-		if e != nil {
-			return With(WithError(err, guard), addCaller())
-		}
-		log.Panicf("can not found current app's meta error for %s:%s\n", err, dyn.Source(), dyn.Code())
-		return err
-	}
-	return With(err, addCaller())
-}
-
-func addCaller() Option {
-	noCallerForNxLock.RLock()
-	add := !noCallerForNx
-	noCallerForNxLock.RUnlock()
-	if add {
-		return CallerAttr.Option(caller(3))
-	}
-	return nil
-}
-
-func caller(skip int) string {
-	pc, _, _, _ := runtime.Caller(skip)
-	path := runtime.FuncForPC(pc).Name()
-	parts := strings.Split(path, "/")
-	return parts[len(parts)-1]
 }
 
 // WithErrorOptions
@@ -172,16 +126,7 @@ type valueError struct {
 }
 
 func (e *valueError) Value(key any) any {
-	if e.key == key {
-		return e.val
-	}
-	if vg, ok := e.val.(valueGetter); ok {
-		value := vg.Value(key)
-		if value != nil {
-			return value
-		}
-	}
-	return Get(e.error, key)
+	return Get(e, key)
 }
 
 func Get(m error, key any) any {
@@ -206,8 +151,46 @@ func Get(m error, key any) any {
 	}
 }
 
+func (e *valueError) Values(key any) []any {
+	return GetAll(e, key)
+}
+
+func GetAll(m error, key any) []any {
+	var all []any
+	for {
+		switch tm := m.(type) {
+		case *valueError:
+			if key == tm.key {
+				all = append(all, tm.val)
+			}
+			if vg, ok := tm.val.(valuesGetter); ok {
+				values := vg.Values(key)
+				if len(values) > 0 {
+					all = append(all, values...)
+				}
+			} else {
+				if vg, ok := tm.val.(valueGetter); ok {
+					value := vg.Value(key)
+					if value != nil {
+						all = append(all, value)
+					}
+				}
+			}
+			m = tm.error
+		case *emptyError:
+			return reverse(all)
+		default:
+			return reverse(all)
+		}
+	}
+}
+
 type valueGetter interface {
 	Value(any) any
+}
+
+type valuesGetter interface {
+	Values(any) []any
 }
 
 // String returns string representation for valueMeta
@@ -341,11 +324,11 @@ func Options(err error) []Option {
 			return &valueError{e, k, v}
 		})
 	}
-	var opts = make([]Option, 0, len(unwrapOpts))
-	for i := len(unwrapOpts) - 1; i >= 0; i-- {
-		opts = append(opts, unwrapOpts[i])
-	}
-	return opts
+	// var opts = make([]Option, 0, len(unwrapOpts))
+	// for i := len(unwrapOpts) - 1; i >= 0; i-- {
+	// 	opts = append(opts, unwrapOpts[i])
+	// }
+	return reverse(unwrapOpts)
 }
 
 // Cause returns the underlying cause of the error, if possible.
@@ -406,31 +389,12 @@ var (
 
 	noCallerForNx     bool
 	noCallerForNxLock sync.RWMutex
-
-	metaMapping     = mappingBySourceCode
-	metaMappingLock sync.RWMutex
 )
 
-func MataMapping() func(*Meta) MetaError {
-	metaMappingLock.RLock()
-	defer metaMappingLock.RUnlock()
-	return metaMapping
-}
-
-func SetMataMapping(fn func(*Meta) MetaError) {
-	metaMappingLock.Lock()
-	defer metaMappingLock.Unlock()
-	metaMapping = fn
-}
-
-// mappingBySourceCode map meta to another by code and source in current app codes
-func mappingBySourceCode(upstream *Meta) MetaError {
-	metaErrorsLock.RLock()
-	defer metaErrorsLock.RUnlock()
-	for id, me := range metaErrors {
-		if MetaID(AppName(), upstream.Source(), upstream.Code()) == id {
-			return me
-		}
+func reverse[T any](in []T) []T {
+	var out = make([]T, 0, len(in))
+	for i := len(in) - 1; i >= 0; i-- {
+		out = append(out, in[i])
 	}
-	return nil
+	return out
 }
