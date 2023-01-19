@@ -34,7 +34,7 @@ err = errors.WithError(err, errors.NotFound)
 
 ```go
 // NOTE: do notknow whether error has carried meta
-err = errors.WithMetaNx(err, errors.Unknown)
+err = errors.Adapt(err, errors.Unknown)
 ```
 
 - error enforce
@@ -96,18 +96,18 @@ errors.Is(err, originErr)                 // true
 errors.Is(err, errors.NotFound)           // true
 errors.Is(err, errors.AlreadyExists)      // false
 
-errors.IsError(err, originErr)            // true
-errors.IsError(err, errors.NotFound)      // true
-errors.IsError(err, errors.AlreadyExists) // false
+errors.IsCauseOrLatest(err, originErr)            // true
+errors.IsCauseOrLatest(err, errors.NotFound)      // true
+errors.IsCauseOrLatest(err, errors.AlreadyExists) // false
 
 err = errors.WithError(err, errors.AlreadyExists)
 errors.Is(err, originErr)                 // true
 errors.Is(err, errors.NotFound)           // true
 errors.Is(err, errors.AlreadyExists)      // true
 
-errors.IsError(err, originErr)            // true
-errors.IsError(err, errors.NotFound)      // false
-errors.IsError(err, errors.AlreadyExists) // true
+errors.IsCauseOrLatest(err, originErr)            // true
+errors.IsCauseOrLatest(err, errors.NotFound)      // false
+errors.IsCauseOrLatest(err, errors.AlreadyExists) // true
 
 err = errors.Adapt(err, errors.Unknown)
 errors.Is(err, originErr)                 // true
@@ -115,10 +115,10 @@ errors.Is(err, errors.NotFound)           // true
 errors.Is(err, errors.AlreadyExists)      // true
 errors.Is(err, errors.Unknown)            // false
 
-errors.IsError(err, originErr)            // true
-errors.IsError(err, errors.NotFound)      // false
-errors.IsError(err, errors.AlreadyExists) // true
-errors.IsError(err, errors.Unknown)       // false
+errors.IsCauseOrLatest(err, originErr)            // true
+errors.IsCauseOrLatest(err, errors.NotFound)      // false
+errors.IsCauseOrLatest(err, errors.AlreadyExists) // true
+errors.IsCauseOrLatest(err, errors.Unknown)       // false
 ```
 
 - error collection

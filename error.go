@@ -332,8 +332,8 @@ func (e *valueError) UnwrapAll() (any, any, error) {
 	return e.key, e.val, e.error
 }
 
-// IsError used to test if err is a error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
-func IsError(err, target error) bool {
+// IsCauseOrLatest used to test if err is a error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
+func IsCauseOrLatest(err, target error) bool {
 	if Cause(err) == target || ErrorAttr.Get(err) == target {
 		return true
 	}
