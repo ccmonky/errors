@@ -17,9 +17,6 @@ func TestNewMetaError(t *testing.T) {
 	assert.Equalf(t, "1", me.Source(), "source 1 new")
 	assert.Equalf(t, "1", me.Code(), "code 1 new")
 	assert.Equalf(t, "1", me.Message(), "msg 1 new")
-	for k, me := range errors.MetaErrors() {
-		t.Log(k, me)
-	}
 
 	me = errors.GetMetaError("myapp:1:1")
 	assert.Equalf(t, "myapp", me.App(), "app 1 get")

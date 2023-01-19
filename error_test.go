@@ -2,6 +2,7 @@ package errors_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -58,7 +59,7 @@ func TestError(t *testing.T) {
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) == errors.AlreadyExists, "get err is alreadyexists")
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) != errors.NotFound, "get err is not notfound")
 	err = errors.Adapt(err, errors.FailedPrecondition)
-	assert.Equalf(t, "xxx:error={meta={source=errors;code=not_found(5)}:status={404}}:msg={wrapper}:caller={TestError}:ctx={context.TODO.WithValue(type *string, val vvv)}:error={meta={source=errors;code=already_exists(6)}:status={409}}:caller={errors_test.TestError:60}", err.Error(), "err with alreadyexists")
+	assert.Equalf(t, "xxx:error={meta={source=errors;code=not_found(5)}:status={404}}:msg={wrapper}:caller={TestError}:ctx={context.TODO.WithValue(type *string, val vvv)}:error={meta={source=errors;code=already_exists(6)}:status={409}}:caller={errors_test.TestError:61}", err.Error(), "err with alreadyexists")
 	assert.Truef(t, errors.Is(err, originErr), "err is originErr after with FailedPrecondition")
 	assert.Truef(t, errors.Is(err, errors.NotFound), "err is notfound after with FailedPrecondition") // NOTE: also true
 	assert.Truef(t, errors.Is(err, errors.AlreadyExists), "err is not alreadyexists after with FailedPrecondition")
@@ -96,6 +97,101 @@ func join[T any](values ...T) string {
 		ss = append(ss, fmt.Sprintf("%v", v))
 	}
 	return strings.Join(ss, "|")
+}
+
+func TestMap(t *testing.T) {
+	err := errors.WithError(errors.New("xxx"), errors.NotFound)
+	err = errors.WithMessage(err, "wrapper1")
+	err = errors.WithCaller(err, "caller1")
+	err = errors.WithError(err, errors.AlreadyExists)
+	err = errors.WithMessage(err, "wrapper2")
+	err = errors.WithCaller(err, "caller2")
+	var ki int
+	err = errors.WithValue(err, &ki, "will not in map")
+	var ks = "ks"
+	err = errors.WithValue(err, &ks, "ks")
+	m := errors.Map(err)
+	assert.Equalf(t, 10, len(m), "m length")
+	assert.Equalf(t, "myapp", m["meta.app"], "meta.app")
+	assert.Equalf(t, "github.com/ccmonky/errors", m["meta.source"], "meta.source")
+	assert.Equalf(t, "already_exists(6)", m["meta.code"], "meta.code")
+	assert.Equalf(t, "already exists", m["meta.message"], "meta.message")
+	assert.Equalf(t, "ks", m["ks"], "ks")
+	assert.Equalf(t, "wrapper2", m["msg"], "msg")
+	assert.Equalf(t, "caller2", m["caller"], "caller")
+	assert.Equalf(t, 409, m["status"], "status")
+	assert.Equalf(t, "meta={source=errors;code=already_exists(6)}:status={409}", fmt.Sprint(m["error"]), "error")
+	assert.Equalf(t, "source=errors;code=already_exists(6)", fmt.Sprint(m["meta"]), "meta")
+}
+
+func TestMarshal(t *testing.T) {
+	err := errors.WithError(errors.New("xxx"), errors.NotFound)
+	err = errors.WithMessage(err, "wrapper1")
+	err = errors.WithCaller(err, "caller1")
+	err = errors.WithError(err, errors.AlreadyExists)
+	err = errors.WithMessage(err, "wrapper2")
+	err = errors.WithCaller(err, "caller2")
+	var ks = "ks"
+	err = errors.WithValue(err, &ks, "ks")
+
+	data, err := json.Marshal(err)
+	assert.Nilf(t, err, "marshal notfound")
+	assert.JSONEq(t, `{
+		"error": {
+			"error": {
+				"error": {
+					"error": {
+						"error": {
+							"error": {
+								"error": {},
+								"key": "error",
+								"value": {
+									"error": {
+										"key": "meta",
+										"value": {
+											"meta.app": "myapp",
+											"meta.code": "not_found(5)",
+											"meta.message": "not found",
+											"meta.source": "github.com/ccmonky/errors"
+										}
+									},
+									"key": "status",
+									"value": 404
+								}
+							},
+							"key": "msg",
+							"value": "wrapper1"
+						},
+						"key": "caller",
+						"value": "caller1"
+					},
+					"key": "error",
+					"value": {
+						"error": {
+							"key": "meta",
+							"value": {
+								"meta.app": "myapp",
+								"meta.code": "already_exists(6)",
+								"meta.message": "already exists",
+								"meta.source": "github.com/ccmonky/errors"
+							}
+						},
+						"key": "status",
+						"value": 409
+					}
+				},
+				"key": "msg",
+				"value": "wrapper2"
+			},
+			"key": "caller",
+			"value": "caller2"
+		},
+		"key": "ks",
+		"value": "ks"
+	}`, string(data), "marshal complex err")
+	_, err = json.Marshal(errors.AllMetaErrors())
+	assert.Nilf(t, err, "marshal all attrs")
+	//t.Log(string(data))
 }
 
 func BenchmarkError(b *testing.B) {
@@ -147,6 +243,28 @@ func BenchmarkError(b *testing.B) {
 		// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
 		// BenchmarkError-12    	  965583	      1228 ns/op	     560 B/op	       9 allocs/op
 		//errors.MessageAttr.GetAll(err)
+	}
+}
+
+func BenchmarkWith(b *testing.B) {
+	err := errors.New("xxx")
+	v := 8
+	a := errors.NewAttr[int]("int")
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		// goos: darwin
+		// goarch: amd64
+		// pkg: github.com/ccmonky/errors
+		// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+		// BenchmarkWith-12    	20057505	        58.95 ns/op	      48 B/op	       1 allocs/op
+		//errors.WithValue(err, a.Key(), v)
+
+		// goos: darwin
+		// goarch: amd64
+		// pkg: github.com/ccmonky/errors
+		// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+		// BenchmarkWith-12    	1000000000	         0.8729 ns/op	       0 B/op	       0 allocs/op
+		a.With(err, v)
 	}
 }
 

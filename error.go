@@ -2,6 +2,7 @@ package errors
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -123,6 +124,34 @@ func WithValue(err error, key, val any) error {
 type valueError struct {
 	error
 	key, val any
+}
+
+func (e *valueError) MarshalJSON() ([]byte, error) {
+	key := fmt.Sprintf("%v", e.key)
+	if ks, ok := e.key.(*string); ok {
+		key = *ks
+	}
+	data, err := json.Marshal(e.error)
+	if err != nil {
+		return nil, WithMessagef(err, "marshal error %v failed", e.error)
+	}
+	var rawError json.RawMessage = data
+	data, err = json.Marshal(e.val)
+	if err != nil {
+		return nil, WithMessagef(err, "marshal val %v failed", e.val)
+	}
+	var rawValue json.RawMessage = data
+	if e.error == empty {
+		return json.Marshal(map[string]any{
+			"key":   key,
+			"value": rawValue,
+		})
+	}
+	return json.Marshal(map[string]any{
+		"error": rawError,
+		"key":   key,
+		"value": rawValue,
+	})
 }
 
 func (e *valueError) Value(key any) any {
@@ -311,6 +340,7 @@ func IsError(err, target error) bool {
 	return false
 }
 
+// Options used to get `[]Option` attached on err
 func Options(err error) []Option {
 	var unwrapOpts []Option
 	for err != nil {
@@ -326,11 +356,53 @@ func Options(err error) []Option {
 			return &valueError{e, k, v}
 		})
 	}
-	// var opts = make([]Option, 0, len(unwrapOpts))
-	// for i := len(unwrapOpts) - 1; i >= 0; i-- {
-	// 	opts = append(opts, unwrapOpts[i])
-	// }
 	return reverse(unwrapOpts)
+}
+
+// Map unwrap all to get `name:value` map of all attrs
+//
+// NOTE:
+// 1. unlike Get or `GetAll`, Map do not traversal the value of `valueError`
+// 2. result will not contain the value if key type is not *string
+// 3. if meta exists, then app, source and message fields will be added into result
+// 4. if key's name duplicates, the result will only contains the latest value
+func Map(err error) map[string]any {
+	var kvs []kv
+	for err != nil {
+		uv, ok := err.(interface {
+			UnwrapAll() (any, any, error)
+		})
+		if !ok {
+			break
+		}
+		var k, v any
+		k, v, err = uv.UnwrapAll()
+		if ksPtr, ok := k.(*string); ok {
+			kvs = append(kvs, kv{*ksPtr, v})
+		}
+	}
+	var m = make(map[string]any, len(kvs)+5) // NOTE: 5 means flatten meta(4)+status(1) in most common scenarios
+	for _, kv := range reverse(kvs) {
+		m[kv.k] = kv.v
+		switch me := kv.v.(type) {
+		case *Meta:
+			m[MetaAttrAppFieldName] = me.app()
+			m[MetaAttrSourceFieldName] = me.source
+			m[MetaAttrCodeFieldName] = me.code
+			m[MetaAttrMessageFieldName] = me.msg
+		case error:
+			mm := Map(me)
+			for kk, vv := range mm {
+				m[kk] = vv
+			}
+		}
+	}
+	return m
+}
+
+type kv struct {
+	k string
+	v any
 }
 
 // Cause returns the underlying cause of the error, if possible.
@@ -357,7 +429,7 @@ func Cause(err error) error {
 	return err
 }
 
-// GetAllErrors get all errors contained in err
+// GetAllErrors get all errors contained in err, all errors attached by `WithError` + Cause
 func GetAllErrors(err error) []error {
 	var errs = []error{
 		Cause(err),
@@ -379,6 +451,7 @@ const (
 	NoValue
 )
 
+// SetFormatMode set mode for formatting the `valueError`
 func SetFormatMode(mode FormatMode) {
 	formatModeLock.Lock()
 	defer formatModeLock.Unlock()
@@ -396,9 +469,6 @@ var (
 
 	formatMode     = Default
 	formatModeLock sync.RWMutex
-
-	noCallerForNx     bool
-	noCallerForNxLock sync.RWMutex
 )
 
 func reverse[T any](in []T) []T {

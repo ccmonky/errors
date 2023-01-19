@@ -2,8 +2,10 @@ package errors
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 
 	"github.com/ccmonky/log"
@@ -65,6 +67,15 @@ type Attr[T any] struct {
 	key          *string
 	defaultValue func(error) any
 	description  string
+}
+
+func (a *Attr[T]) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"type":                   reflect.TypeOf(new(T)).Elem().String(),
+		"name":                   *a.key,
+		"description":            a.description,
+		"has_default_value_func": a.defaultValue != nil,
+	})
 }
 
 // NewAttr creates a new `Attr`
@@ -145,8 +156,13 @@ func WithAttrPanicOnDuplicateNames(noPanic bool) AttrOption {
 }
 
 // Key returns the internal key of Attr
-func (a Attr[T]) Name() string {
+func (a *Attr[T]) Name() string {
 	return *a.key
+}
+
+// Description returns the description of Attr
+func (a *Attr[T]) Description() string {
+	return a.description
 }
 
 // Key returns the internal key of Attr
@@ -183,6 +199,12 @@ func (a *Attr[T]) Get(err error) T {
 	return *new(T)
 }
 
+// GetAny return attr value of err as any
+func (a *Attr[T]) GetAny(err error) any {
+	return a.Get(err)
+}
+
+// GetAll get all values specified by Attr's internal key from error
 func (a *Attr[T]) GetAll(err error) []T {
 	var all []T
 	values := GetAll(err, a.key)
@@ -247,7 +269,22 @@ func GetAttrByName[T any](name string) (*Attr[T], error) {
 	return a, nil
 }
 
+// AllAttrs return all registered Attrs
+func AllAttrs() map[string]any {
+	m := make(map[string]any)
+	fn := func(key, value any) bool {
+		m[fmt.Sprintf("%s:%v", *key.(*string), key)] = value
+		return true
+	}
+	attrs.Range(fn)
+	return m
+}
+
 var (
 	attrs     sync.Map // map[*string]*Attr
 	nameAttrs sync.Map // map[string]*Attr
+)
+
+var (
+	_ AttrInterface = (*Attr[error])(nil)
 )

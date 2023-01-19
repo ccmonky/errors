@@ -1,31 +1,49 @@
 package errors
 
 var (
-	MetaAppAttrName     string = "app_name"
-	MetaSourceAttrName  string = "source"
-	MetaCodeAttrName    string = "code"
-	MetaMessageAttrName string = "message"
+	MetaAttrAppFieldName     string = "meta.app"
+	MetaAttrSourceFieldName  string = "meta.source"
+	MetaAttrCodeFieldName    string = "meta.code"
+	MetaAttrMessageFieldName string = "meta.message"
 )
 
-// Attrs returns meta attrs specified by attrFuncs and buitins(app, code, message, status)
-func Attrs(err error, attrFuncs ...AttrFunc) map[string]any {
-	m := make(map[string]any, 4+len(attrFuncs))
-	m[MetaAppAttrName] = GetApp(err)
-	m[MetaSourceAttrName] = GetSource(err)
-	m[MetaCodeAttrName] = GetCode(err)
-	m[MetaMessageAttrName] = GetMessage(err)
-	var fns = make([]AttrFunc, 0, 1+len(attrFuncs))
-	fns = append(fns, func(err error) (string, any) { return StatusAttr.Name(), StatusAttr.Get(err) })
-	fns = append(fns, attrFuncs...)
-	for _, fn := range fns {
-		k, v := fn(err)
-		m[k] = v
+// AttrInterface abstract Attr's minimal interface used for `Attrs`
+type AttrInterface interface {
+	Key() any
+	Name() string
+	Description() string
+	GetAny(error) any
+}
+
+// Attrs is a group of AttrInterface, which usually used to extractor attrs's values
+type Attrs []AttrInterface
+
+// NewAttrs create new Attrs
+func NewAttrs(attrs ...AttrInterface) Attrs {
+	return Attrs(attrs)
+}
+
+// Map returns the name:value map of Attrs according to Attrs's order
+func (as Attrs) Map(err error) map[string]any {
+	var m = make(map[string]any, len(as)+5) // NOTE: 5 means flatten meta(4)+status(1) in most common scenarios
+	for _, a := range as {
+		v := Get(err, a.Key())
+		m[*a.Key().(*string)] = v
+		switch me := v.(type) {
+		case *Meta:
+			m[MetaAttrAppFieldName] = me.app()
+			m[MetaAttrSourceFieldName] = me.source
+			m[MetaAttrCodeFieldName] = me.code
+			m[MetaAttrMessageFieldName] = me.msg
+		case error:
+			mm := Map(me)
+			for kk, vv := range mm {
+				m[kk] = vv
+			}
+		}
 	}
 	return m
 }
-
-// AttrFunc defines attr getter function from error
-type AttrFunc func(error) (attr string, value any)
 
 // GetApp get app name from error if err is ContextError, otherwise return empty string
 func GetApp(err error) string {

@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -48,6 +49,15 @@ func newMeta(source, code, msg string) *Meta {
 		msg:    msg,
 	}
 	return &m
+}
+
+func (e *Meta) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"meta.app":     e.app(),
+		"meta.source":  e.source,
+		"meta.code":    e.code,
+		"meta.message": e.msg,
+	})
 }
 
 func (e *Meta) App() string {
@@ -121,8 +131,8 @@ func GetMetaError(id string) MetaError {
 	return metaErrors[id]
 }
 
-// MetaErrors return all registered MetaErrors as a map with key is `app:source:code`
-func MetaErrors() map[metaID]MetaError {
+// AllMetaErrors return all registered MetaErrors as a map with key is `app:source:code`
+func AllMetaErrors() map[metaID]MetaError {
 	var result = map[metaID]MetaError{}
 	metaErrorsLock.RLock()
 	defer metaErrorsLock.RUnlock()
