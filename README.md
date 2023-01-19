@@ -30,7 +30,7 @@ err := errors.New("xxx")
 err = errors.WithError(err, errors.NotFound)
 ```
 
-- error(meta) guard
+- error(meta) fallback
 
 ```go
 // NOTE: do notknow whether error has carried meta

@@ -78,15 +78,15 @@ type adapter struct {
 // that is, if dyn's app != current app name, then it will be considered as an Meta casted from upstream, so it can not be
 // used directly, and should be mapping to current app's meta, the default mapping is by source+code, unless you specify
 // a mapping funciton
-func (a *adapter) Adapt(err error, guard MetaError) error {
+func (a *adapter) Adapt(err error, fallback MetaError) error {
 	if err == nil {
 		return nil
 	}
-	if guard == nil {
-		guard = Unknown
+	if fallback == nil {
+		fallback = Unknown
 	}
-	if guard.App() != AppName() {
-		log.Panicf("gurad meta error's app(%s) != current app name(%s)\n", guard.App(), AppName())
+	if fallback.App() != AppName() {
+		log.Panicf("gurad meta error's app(%s) != current app name(%s)\n", fallback.App(), AppName())
 		return err
 	}
 	var opts []Option
@@ -97,12 +97,12 @@ func (a *adapter) Adapt(err error, guard MetaError) error {
 	opts = append(opts, a.DefaultOptions...)
 	dyn := MetaAttr.Get(err)
 	if dyn == nil {
-		return With(WithError(err, guard), opts...)
+		return With(WithError(err, fallback), opts...)
 	}
 	if dyn.App() != AppName() { // NOTE: maybe upstream case || bad dynamic case
 		e := a.MetaMappingFunc(dyn) // NOTE: try to map to current app's meta error by source & code
 		if e != nil {
-			return With(WithError(err, guard), opts...)
+			return With(WithError(err, fallback), opts...)
 		}
 		log.Panicf("can not found current app's meta error for %s:%s\n", err, dyn.Source(), dyn.Code())
 		return err
