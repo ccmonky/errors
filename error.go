@@ -151,10 +151,12 @@ func Get(m error, key any) any {
 	}
 }
 
+// Values get all values of key recursively
 func (e *valueError) Values(key any) []any {
 	return GetAll(e, key)
 }
 
+// GetAll get all values of key recursively
 func GetAll(m error, key any) []any {
 	var all []any
 	for {
@@ -296,17 +298,17 @@ func (e *valueError) Message() string {
 	return ""
 }
 
+// UnwrapAll unwrap to get error, key and value
+func (e *valueError) UnwrapAll() (any, any, error) {
+	return e.key, e.val, e.error
+}
+
 // IsError used to test if err is a error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
 func IsError(err, target error) bool {
 	if Cause(err) == target || ErrorAttr.Get(err) == target {
 		return true
 	}
 	return false
-}
-
-// UnwrapAll unwrap to get error, key and value
-func (e *valueError) UnwrapAll() (any, any, error) {
-	return e.key, e.val, e.error
 }
 
 func Options(err error) []Option {
@@ -353,6 +355,14 @@ func Cause(err error) error {
 		err = u.Unwrap()
 	}
 	return err
+}
+
+// GetAllErrors get all errors contained in err
+func GetAllErrors(err error) []error {
+	var errs = []error{
+		Cause(err),
+	}
+	return append(errs, ErrorAttr.GetAll(err)...)
 }
 
 // FormatMode used to format Meta value wrapper

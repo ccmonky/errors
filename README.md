@@ -119,6 +119,13 @@ errors.IsError(err, errors.Unknown)       // false
 
 - error aggregation
 
+```go
+err := errors.WithError(errors.New("e1"), errors.New("e2"))
+err = errors.WithError(err, errors.New("e3"))
+log.Println(errors.GetAllErrors(err))
+// Output: [e1 e2 e3]
+```
+
 - error attr extraction
 
 ```go

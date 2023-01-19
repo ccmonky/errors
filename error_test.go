@@ -3,6 +3,7 @@ package errors_test
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 
@@ -193,4 +194,11 @@ func BenchmarkContext(b *testing.B) {
 		// BenchmarkContext-12    	10423622	       118.1 ns/op	       0 B/op	       0 allocs/op
 		//ctx.Value("k1")
 	}
+}
+
+func TestX(t *testing.T) {
+	err := errors.WithError(errors.New("e1"), errors.New("e2"))
+	err = errors.WithError(err, errors.New("e3"))
+	log.Println(errors.GetAllErrors(err))
+	t.Fatal(1)
 }

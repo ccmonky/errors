@@ -52,10 +52,6 @@ func GetCode(err error) string {
 		return m.code
 	}
 	return ""
-	// if err != nil {
-	// 	return Unknown.Code()
-	// }
-	// return OK.Code()
 }
 
 // GetMessage returns error message if err is ContextError, otherwise return Unknown.Message() if err != nil else return Ok.Message()
@@ -65,8 +61,4 @@ func GetMessage(err error) string {
 		return m.msg
 	}
 	return ""
-	// if err != nil {
-	// 	return Unknown.Message()
-	// }
-	// return OK.Message()
 }
