@@ -96,18 +96,18 @@ errors.Is(err, originErr)                 // true
 errors.Is(err, errors.NotFound)           // true
 errors.Is(err, errors.AlreadyExists)      // false
 
-errors.IsCauseOrLatest(err, originErr)            // true
-errors.IsCauseOrLatest(err, errors.NotFound)      // true
-errors.IsCauseOrLatest(err, errors.AlreadyExists) // false
+errors.IsCauseOrLatestMetaError(err, originErr)            // true
+errors.IsCauseOrLatestMetaError(err, errors.NotFound)      // true
+errors.IsCauseOrLatestMetaError(err, errors.AlreadyExists) // false
 
 err = errors.WithError(err, errors.AlreadyExists)
 errors.Is(err, originErr)                 // true
 errors.Is(err, errors.NotFound)           // true
 errors.Is(err, errors.AlreadyExists)      // true
 
-errors.IsCauseOrLatest(err, originErr)            // true
-errors.IsCauseOrLatest(err, errors.NotFound)      // false
-errors.IsCauseOrLatest(err, errors.AlreadyExists) // true
+errors.IsCauseOrLatestMetaError(err, originErr)            // true
+errors.IsCauseOrLatestMetaError(err, errors.NotFound)      // false
+errors.IsCauseOrLatestMetaError(err, errors.AlreadyExists) // true
 
 err = errors.Adapt(err, errors.Unknown)
 errors.Is(err, originErr)                 // true
@@ -115,10 +115,10 @@ errors.Is(err, errors.NotFound)           // true
 errors.Is(err, errors.AlreadyExists)      // true
 errors.Is(err, errors.Unknown)            // false
 
-errors.IsCauseOrLatest(err, originErr)            // true
-errors.IsCauseOrLatest(err, errors.NotFound)      // false
-errors.IsCauseOrLatest(err, errors.AlreadyExists) // true
-errors.IsCauseOrLatest(err, errors.Unknown)       // false
+errors.IsCauseOrLatestMetaError(err, originErr)            // true
+errors.IsCauseOrLatestMetaError(err, errors.NotFound)      // false
+errors.IsCauseOrLatestMetaError(err, errors.AlreadyExists) // true
+errors.IsCauseOrLatestMetaError(err, errors.Unknown)       // false
 ```
 
 - error collection

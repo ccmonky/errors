@@ -18,6 +18,13 @@ func init() {
 	})
 }
 
+var (
+	MetaAttrAppFieldName     string = "meta.app"
+	MetaAttrSourceFieldName  string = "meta.source"
+	MetaAttrCodeFieldName    string = "meta.code"
+	MetaAttrMessageFieldName string = "meta.message"
+)
+
 // Option used to attach value on error
 type Option func(error) error
 
@@ -277,24 +284,6 @@ func (e *valueError) Format(s fmt.State, verb rune) {
 	}
 }
 
-// Unwrap used to response to `errors.Unwrap`
-func (e *valueError) Unwrap() error {
-	return e.error
-}
-
-// Is implement errors.Is for valueError, to test if a `valueError` wrap from target, used for error assertion
-//
-// Usage:
-//
-//     err := errors.With(errors.Errorf("xxx"), errors.ErrorOption(errors.NotFound), errors.MessageOption("..."))
-//     errors.Is(err, errros.NotFound) // true
-//
-// NOTE:
-// 1. if err chain first wrapped with a error err1, then wrapped with a second err2, errors.Is(err, err1) is also true!
-func (e *valueError) Is(target error) bool {
-	return ErrorAttr.Get(e) == target
-}
-
 func (e *valueError) App() string {
 	value := e.Value(MetaAttr.Key())
 	if m, ok := value.(*Meta); ok {
@@ -327,17 +316,27 @@ func (e *valueError) Message() string {
 	return ""
 }
 
+// Unwrap used to response to `errors.Unwrap`
+func (e *valueError) Unwrap() error {
+	return e.error
+}
+
+// Is implement errors.Is for valueError, to test if a `valueError` wrap from target, used for error assertion
+//
+// Usage:
+//
+//     err := errors.With(errors.Errorf("xxx"), errors.ErrorOption(errors.NotFound), errors.MessageOption("..."))
+//     errors.Is(err, errros.NotFound) // true
+//
+// NOTE:
+// 1. if err chain first wrapped with a error err1, then wrapped with a second err2, errors.Is(err, err1) is also true!
+func (e *valueError) Is(target error) bool {
+	return ErrorAttr.Get(e) == target
+}
+
 // UnwrapAll unwrap to get error, key and value
 func (e *valueError) UnwrapAll() (any, any, error) {
 	return e.key, e.val, e.error
-}
-
-// IsCauseOrLatest used to test if err is a error, return true only if target == Cause(err) || target == ErrorAttr.Get(err)
-func IsCauseOrLatest(err, target error) bool {
-	if Cause(err) == target || ErrorAttr.Get(err) == target {
-		return true
-	}
-	return false
 }
 
 // Options used to get `[]Option` attached on err
@@ -429,12 +428,67 @@ func Cause(err error) error {
 	return err
 }
 
+// GetApp get app name from error if err is ContextError, otherwise return empty string
+func GetApp(err error) string {
+	m := MetaAttr.Get(err)
+	if m != nil {
+		return m.app()
+	}
+	return ""
+}
+
+// GetSource returns error source if err is ContextError, otherwise return empty string
+func GetSource(err error) string {
+	m := MetaAttr.Get(err)
+	if m != nil {
+		return m.source
+	}
+	return ""
+}
+
+// GetCode returns error code if err is ContextError, otherwise return Unknown.Code() if err != nil else return Ok.Code()
+func GetCode(err error) string {
+	m := MetaAttr.Get(err)
+	if m != nil {
+		return m.code
+	}
+	return ""
+}
+
+// GetMessage returns error message if err is ContextError, otherwise return Unknown.Message() if err != nil else return Ok.Message()
+func GetMessage(err error) string {
+	m := MetaAttr.Get(err)
+	if m != nil {
+		return m.msg
+	}
+	return ""
+}
+
 // GetAllErrors get all errors contained in err, all errors attached by `WithError` + Cause
 func GetAllErrors(err error) []error {
 	var errs = []error{
 		Cause(err),
 	}
 	return append(errs, ErrorAttr.GetAll(err)...)
+}
+
+// GetLatestMetaError return the latest MetaError in err, returns nil if not found
+func GetLatestMetaError(err error) MetaError {
+	errs := GetAllErrors(err)
+	for i := len(errs) - 1; i >= 0; i-- {
+		if me, ok := errs[i].(MetaError); ok {
+			return me
+		}
+	}
+	return nil
+}
+
+// IsCauseOrLatest used to test if err is a error, return true only if target == Cause(err) || target == GetLatestMetaError(err)
+func IsCauseOrLatestMetaError(err, target error) bool {
+	if Cause(err) == target || GetLatestMetaError(err) == target {
+		return true
+	}
+	return false
 }
 
 // FormatMode used to format Meta value wrapper

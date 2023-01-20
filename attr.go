@@ -280,6 +280,44 @@ func AllAttrs() map[string]any {
 	return m
 }
 
+// AttrInterface abstract Attr's minimal interface used for `Attrs`
+type AttrInterface interface {
+	Key() any
+	Name() string
+	Description() string
+	GetAny(error) any
+}
+
+// Attrs is a group of AttrInterface, which usually used to extractor attrs's values
+type Attrs []AttrInterface
+
+// NewAttrs create new Attrs
+func NewAttrs(attrs ...AttrInterface) Attrs {
+	return Attrs(attrs)
+}
+
+// Map returns the name:value map of Attrs according to Attrs's order
+func (as Attrs) Map(err error) map[string]any {
+	var m = make(map[string]any, len(as)+5) // NOTE: 5 means flatten meta(4)+status(1) in most common scenarios
+	for _, a := range as {
+		v := Get(err, a.Key())
+		m[*a.Key().(*string)] = v
+		switch me := v.(type) {
+		case *Meta:
+			m[MetaAttrAppFieldName] = me.app()
+			m[MetaAttrSourceFieldName] = me.source
+			m[MetaAttrCodeFieldName] = me.code
+			m[MetaAttrMessageFieldName] = me.msg
+		case error:
+			mm := Map(me)
+			for kk, vv := range mm {
+				m[kk] = vv
+			}
+		}
+	}
+	return m
+}
+
 var (
 	attrs     sync.Map // map[*string]*Attr
 	nameAttrs sync.Map // map[string]*Attr

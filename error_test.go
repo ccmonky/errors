@@ -53,9 +53,9 @@ func TestError(t *testing.T) {
 	assert.Equalf(t, "github.com/ccmonky/errors", meta.Source(), "err meta source 2")
 	assert.Equalf(t, "already_exists(6)", meta.Code(), "err meta code 2")
 	assert.Equalf(t, "already exists", meta.Message(), "err meta message 2")
-	assert.Truef(t, errors.IsCauseOrLatest(err, originErr), "err is originErr")
-	assert.Truef(t, !errors.IsCauseOrLatest(err, errors.NotFound), "err is not notfound")
-	assert.Truef(t, errors.IsCauseOrLatest(err, errors.AlreadyExists), "err is alreadyexists")
+	assert.Truef(t, errors.IsCauseOrLatestMetaError(err, originErr), "err is originErr")
+	assert.Truef(t, !errors.IsCauseOrLatestMetaError(err, errors.NotFound), "err is not notfound")
+	assert.Truef(t, errors.IsCauseOrLatestMetaError(err, errors.AlreadyExists), "err is alreadyexists")
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) == errors.AlreadyExists, "get err is alreadyexists")
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) != errors.NotFound, "get err is not notfound")
 	err = errors.Adapt(err, errors.FailedPrecondition)
@@ -64,10 +64,10 @@ func TestError(t *testing.T) {
 	assert.Truef(t, errors.Is(err, errors.NotFound), "err is notfound after with FailedPrecondition") // NOTE: also true
 	assert.Truef(t, errors.Is(err, errors.AlreadyExists), "err is not alreadyexists after with FailedPrecondition")
 	assert.Truef(t, !errors.Is(err, errors.FailedPrecondition), "err is not alreadyexists after with FailedPrecondition")
-	assert.Truef(t, errors.IsCauseOrLatest(err, originErr), "err is originErr after with FailedPrecondition")
-	assert.Truef(t, !errors.IsCauseOrLatest(err, errors.NotFound), "err is not notfound  after with FailedPrecondition")
-	assert.Truef(t, errors.IsCauseOrLatest(err, errors.AlreadyExists), "err is alreadyexists after with FailedPrecondition")
-	assert.Truef(t, !errors.IsCauseOrLatest(err, errors.FailedPrecondition), "err is not alreadyexists after with FailedPrecondition")
+	assert.Truef(t, errors.IsCauseOrLatestMetaError(err, originErr), "err is originErr after with FailedPrecondition")
+	assert.Truef(t, !errors.IsCauseOrLatestMetaError(err, errors.NotFound), "err is not notfound  after with FailedPrecondition")
+	assert.Truef(t, errors.IsCauseOrLatestMetaError(err, errors.AlreadyExists), "err is alreadyexists after with FailedPrecondition")
+	assert.Truef(t, !errors.IsCauseOrLatestMetaError(err, errors.FailedPrecondition), "err is not alreadyexists after with FailedPrecondition")
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) == errors.AlreadyExists, "get err is alreadyexists after with FailedPrecondition")
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) != errors.NotFound, "get err is not notfound after with FailedPrecondition")
 	assert.Truef(t, errors.Get(err, errors.ErrorAttr.Key()) != errors.FailedPrecondition, "get err is not notfound after with FailedPrecondition")
@@ -122,6 +122,22 @@ func TestMap(t *testing.T) {
 	assert.Equalf(t, 409, m["status"], "status")
 	assert.Equalf(t, "meta={source=errors;code=already_exists(6)}:status={409}", fmt.Sprint(m["error"]), "error")
 	assert.Equalf(t, "source=errors;code=already_exists(6)", fmt.Sprint(m["meta"]), "meta")
+}
+
+func TestGetLatestMetaError(t *testing.T) {
+	err := errors.New("xxx")
+	err = errors.WithError(err, errors.NotFound)
+	assert.Equalf(t, errors.NotFound, errors.GetLatestMetaError(err), "is notfound")
+	err = errors.WithMessage(err, "wrapper")
+	assert.Equalf(t, errors.NotFound, errors.GetLatestMetaError(err), "is notfound")
+	err = errors.WithError(err, errors.New("yyy"))
+	assert.Equalf(t, errors.NotFound, errors.GetLatestMetaError(err), "is notfound")
+	err = errors.WithError(err, errors.AlreadyExists)
+	assert.Equalf(t, errors.AlreadyExists, errors.GetLatestMetaError(err), "is AlreadyExists")
+	err = errors.WithMessage(err, "wrapper2")
+	assert.Equalf(t, errors.AlreadyExists, errors.GetLatestMetaError(err), "is AlreadyExists")
+	err = errors.WithError(err, errors.New("zzz"))
+	assert.Equalf(t, errors.AlreadyExists, errors.GetLatestMetaError(err), "is AlreadyExists")
 }
 
 func TestMarshal(t *testing.T) {
