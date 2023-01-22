@@ -47,6 +47,14 @@ func TestGetAttr(t *testing.T) {
 	assert.Truef(t, nil != err, "status with bad name: %v", err)
 }
 
+func TestStatus(t *testing.T) {
+	assert.Equalf(t, 200, errors.StatusAttr.Get(nil), "err nil")
+	err := errors.WithMessage(errors.New("xxx"), "wrapper")
+	assert.Equalf(t, 500, errors.StatusAttr.Get(err), "err no status")
+	err = errors.WithError(err, errors.NotFound)
+	assert.Equalf(t, 404, errors.StatusAttr.Get(err), "err with status")
+}
+
 func TestAttrs(t *testing.T) {
 	err := errors.WithError(errors.New("xxx"), errors.NotFound)
 	err = errors.WithMessage(err, "wrapper1")

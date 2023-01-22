@@ -187,10 +187,12 @@ func (a *Attr[T]) Option(value T) Option {
 func (a *Attr[T]) Get(err error) T {
 	if ce, ok := err.(Error); ok {
 		value := ce.Value(a.key)
-		if tv, ok := value.(T); ok {
-			return tv
-		} else {
-			log.Panicf("attr %v got invalid type value, expect %T, got %T", *a.key, *new(T), value)
+		if value != nil {
+			if tv, ok := value.(T); ok {
+				return tv
+			} else {
+				log.Panicf("attr %v got invalid type value, expect %T, got %T", *a.key, *new(T), value)
+			}
 		}
 	}
 	if a.defaultValue != nil {
